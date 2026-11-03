@@ -1,0 +1,40 @@
+name: API
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MYSQL_ROOT_PASSWORD: ci-root-descartavel
+      MYSQL_PASSWORD: ci-app-descartavel
+      MYSQL_DATABASE: smarttraffic
+      MYSQL_USER: smarttraffic_app
+      DATABASE_URL: mysql://root:ci-root-descartavel@127.0.0.1:3306/smarttraffic_api_teste
+      JWT_SECRET: ci-jwt-secret-descartavel-com-mais-de-32-caracteres
+      INGESTION_KEY: ci-ingestion-key-descartavel-com-mais-de-32-caracteres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: smartraffic-team/database
+          path: database
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Iniciar MySQL com SQL oficial
+        run: docker compose -f database/docker-compose.yml up -d --wait --wait-timeout 240
+      - name: Criar banco de integração isolado
+        run: |
+          docker compose -f database/docker-compose.yml exec -T mysql sh -c 'MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -uroot -e "CREATE DATABASE smarttraffic_api_teste CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
+          docker compose -f database/docker-compose.yml exec -T mysql sh -c 'export MYSQL_PWD=$MYSQL_ROOT_PASSWORD; mysql -uroot -D smarttraffic_api_teste < /smarttraffic/sql/00_preparacao.sql; mysql -uroot -D smarttraffic_api_teste < /smarttraffic/sql/01_schema.sql; mysql -uroot -D smarttraffic_api_teste < /smarttraffic/sql/02_seed_maquete.sql; mysql -uroot -D smarttraffic_api_teste < /smarttraffic/sql/03_verificacao_seed.sql'
+      - run: npm run test:integration
+      - if: always()
+        run: docker compose -f database/docker-compose.yml down -v

@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model alertas {
+  id                                                   BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  dispositivo_id                                       BigInt?       @db.UnsignedBigInt
+  usuario_reconhecimento_id                            BigInt?       @db.UnsignedBigInt
+  usuario_resolucao_id                                 BigInt?       @db.UnsignedBigInt
+  tipo                                                 String        @db.VarChar(40)
+  titulo                                               String        @db.VarChar(150)
+  gravidade                                            String        @default("AVISO") @db.VarChar(20)
+  situacao                                             String        @default("ATIVO") @db.VarChar(20)
+  descricao                                            String        @db.Text
+  ocorrido_em                                          DateTime      @default(now())
+  reconhecido_em                                       DateTime?
+  resolvido_em                                         DateTime?
+  dispositivos                                         dispositivos? @relation(fields: [dispositivo_id], references: [id], onUpdate: Restrict, map: "fk_alertas_dispositivo")
+  usuarios_alertas_usuario_reconhecimento_idTousuarios usuarios?     @relation("alertas_usuario_reconhecimento_idTousuarios", fields: [usuario_reconhecimento_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_alertas_usuario_reconhecimento")
+  usuarios_alertas_usuario_resolucao_idTousuarios      usuarios?     @relation("alertas_usuario_resolucao_idTousuarios", fields: [usuario_resolucao_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_alertas_usuario_resolucao")
+
+  @@index([dispositivo_id], map: "ix_alertas_dispositivo")
+  @@index([situacao, ocorrido_em], map: "ix_alertas_situacao_data")
+  @@index([usuario_reconhecimento_id], map: "ix_alertas_usuario_reconhecimento")
+  @@index([usuario_resolucao_id], map: "ix_alertas_usuario_resolucao")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cruzamentos {
+  id            Int            @id @default(1) @db.UnsignedTinyInt
+  codigo        String         @unique(map: "uq_cruzamentos_codigo") @default("CRZ-001") @db.VarChar(30)
+  nome          String         @default("Maquete SmartTraffic") @db.VarChar(120)
+  descricao     String?        @db.VarChar(255)
+  ambiente      String         @default("FISICO") @db.VarChar(20)
+  ativo         Boolean        @default(true)
+  criado_em     DateTime       @default(now())
+  atualizado_em DateTime       @default(now())
+  dispositivos  dispositivos[]
+  vias          vias[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model dispositivos {
+  id                      BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
+  cruzamento_id           Int                       @default(1) @db.UnsignedTinyInt
+  via_id                  BigInt?                   @db.UnsignedBigInt
+  codigo                  String                    @unique(map: "uq_dispositivos_codigo") @db.VarChar(40)
+  nome                    String                    @db.VarChar(120)
+  tipo                    String                    @db.VarChar(30)
+  modelo                  String?                   @db.VarChar(120)
+  versao_software         String?                   @db.VarChar(50)
+  endereco_ip             String?                   @db.VarChar(45)
+  status                  String                    @default("DESCONHECIDO") @db.VarChar(20)
+  ativo                   Boolean                   @default(true)
+  ultimo_contato_em       DateTime?
+  criado_em               DateTime                  @default(now())
+  atualizado_em           DateTime                  @default(now())
+  alertas                 alertas[]
+  cruzamentos             cruzamentos               @relation(fields: [cruzamento_id], references: [id], onUpdate: Restrict, map: "fk_dispositivos_cruzamento")
+  vias                    vias?                     @relation(fields: [via_id], references: [id], onUpdate: Restrict, map: "fk_dispositivos_via")
+  eventos_sistema         eventos_sistema[]
+  leituras_trafego        leituras_trafego[]
+  telemetria_dispositivos telemetria_dispositivos[]
+
+  @@index([cruzamento_id], map: "ix_dispositivos_cruzamento")
+  @@index([tipo], map: "ix_dispositivos_tipo")
+  @@index([via_id], map: "ix_dispositivos_via")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model eventos_sistema {
+  id             BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  dispositivo_id BigInt?       @db.UnsignedBigInt
+  usuario_id     BigInt?       @db.UnsignedBigInt
+  categoria      String        @db.VarChar(40)
+  gravidade      String        @default("INFO") @db.VarChar(20)
+  descricao      String        @db.Text
+  ocorrido_em    DateTime      @default(now())
+  registrado_em  DateTime      @default(now())
+  dispositivos   dispositivos? @relation(fields: [dispositivo_id], references: [id], onUpdate: Restrict, map: "fk_eventos_dispositivo")
+  usuarios       usuarios?     @relation(fields: [usuario_id], references: [id], onUpdate: Restrict, map: "fk_eventos_usuario")
+
+  @@index([dispositivo_id, ocorrido_em], map: "ix_eventos_dispositivo_data")
+  @@index([ocorrido_em], map: "ix_eventos_ocorrido")
+  @@index([usuario_id], map: "ix_eventos_usuario")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model historico_fases {
+  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  semaforo_id          BigInt    @db.UnsignedBigInt
+  cor                  String    @db.VarChar(20)
+  inicio_em            DateTime
+  fim_em               DateTime?
+  origem_estado        String    @default("SISTEMA") @db.VarChar(30)
+  modo_operacao        String?   @db.VarChar(20)
+  registrado_em        DateTime  @default(now())
+  // Coluna gerada no MySQL; o indice unico permanece no SQL oficial.
+  semaforo_fase_aberta BigInt?   @ignore @db.UnsignedBigInt
+  semaforos            semaforos @relation(fields: [semaforo_id], references: [id], onUpdate: Restrict, map: "fk_fases_semaforo")
+
+  @@unique([semaforo_id, inicio_em], map: "uq_fases_semaforo_inicio")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model leituras_trafego {
+  id                   BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
+  via_id               BigInt       @db.UnsignedBigInt
+  dispositivo_id       BigInt       @db.UnsignedBigInt
+  identificador_evento String       @db.Char(36)
+  registrado_em        DateTime
+  recebido_em          DateTime     @default(now())
+  tipo_leitura         String       @default("QUADRO") @db.VarChar(20)
+  origem_leitura       String       @db.VarChar(30)
+  periodo_inicio_em    DateTime?
+  carros_detectados    Int          @default(0) @db.UnsignedInt
+  pedestres_detectados Int          @default(0) @db.UnsignedInt
+  veiculos_em_espera   Int?         @db.UnsignedInt
+  veiculos_unicos      Int?         @db.UnsignedInt
+  dispositivos         dispositivos @relation(fields: [dispositivo_id], references: [id], onUpdate: Restrict, map: "fk_leituras_dispositivo")
+  vias                 vias         @relation(fields: [via_id], references: [id], onUpdate: Restrict, map: "fk_leituras_via")
+
+  @@unique([dispositivo_id, identificador_evento], map: "uq_leituras_dispositivo_evento")
+  @@index([registrado_em], map: "ix_leituras_data")
+  @@index([via_id, registrado_em], map: "ix_leituras_via_data")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model semaforos {
+  id                     BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  via_id                 BigInt            @unique(map: "uq_semaforos_via") @db.UnsignedBigInt
+  nome                   String            @db.VarChar(100)
+  cor_atual              String            @default("DESCONHECIDA") @db.VarChar(20)
+  modo_operacao          String            @default("DESCONHECIDO") @db.VarChar(20)
+  verde_minimo_seg       Int               @default(8) @db.UnsignedSmallInt
+  verde_padrao_seg       Int               @default(10) @db.UnsignedSmallInt
+  verde_maximo_seg       Int               @default(20) @db.UnsignedSmallInt
+  amarelo_seg            Int               @default(3) @db.UnsignedSmallInt
+  vermelho_seguranca_seg Int               @default(1) @db.UnsignedSmallInt
+  ativo                  Boolean           @default(true)
+  atualizado_em          DateTime          @default(now())
+  historico_fases        historico_fases[]
+  vias                   vias              @relation(fields: [via_id], references: [id], onUpdate: Restrict, map: "fk_semaforos_via")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model telemetria_dispositivos {
+  id                 BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
+  dispositivo_id     BigInt       @db.UnsignedBigInt
+  registrado_em      DateTime
+  recebido_em        DateTime     @default(now())
+  status             String       @default("DESCONHECIDO") @db.VarChar(20)
+  cpu_percentual     Decimal?     @db.Decimal(5, 2)
+  memoria_percentual Decimal?     @db.Decimal(5, 2)
+  temperatura_c      Decimal?     @db.Decimal(6, 2)
+  fps                Decimal?     @db.Decimal(7, 2)
+  latencia_ms        Int?         @db.UnsignedInt
+  dispositivos       dispositivos @relation(fields: [dispositivo_id], references: [id], onUpdate: Restrict, map: "fk_telemetria_dispositivo")
+
+  @@unique([dispositivo_id, registrado_em], map: "uq_telemetria_dispositivo_data")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model usuarios {
+  id                                                  BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  nome                                                String            @db.VarChar(150)
+  email                                               String            @unique(map: "uq_usuarios_email") @db.VarChar(190)
+  telefone                                            String?           @db.VarChar(20)
+  nivel_acesso                                        String            @default("VISUALIZADOR") @db.VarChar(20)
+  cargo                                               String?           @db.VarChar(100)
+  senha_hash                                          String            @db.VarChar(255)
+  ativo                                               Boolean           @default(true)
+  ultimo_acesso_em                                    DateTime?
+  criado_em                                           DateTime          @default(now())
+  atualizado_em                                       DateTime          @default(now())
+  alertas_alertas_usuario_reconhecimento_idTousuarios alertas[]         @relation("alertas_usuario_reconhecimento_idTousuarios")
+  alertas_alertas_usuario_resolucao_idTousuarios      alertas[]         @relation("alertas_usuario_resolucao_idTousuarios")
+  eventos_sistema                                     eventos_sistema[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model vias {
+  id               BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  cruzamento_id    Int                @default(1) @db.UnsignedTinyInt
+  codigo           String             @unique(map: "uq_vias_codigo") @db.Char(1)
+  nome             String             @db.VarChar(120)
+  ativa            Boolean            @default(true)
+  criado_em        DateTime           @default(now())
+  dispositivos     dispositivos[]
+  leituras_trafego leituras_trafego[]
+  semaforos        semaforos?
+  cruzamentos      cruzamentos        @relation(fields: [cruzamento_id], references: [id], onUpdate: Restrict, map: "fk_vias_cruzamento")
+
+  @@index([cruzamento_id], map: "ix_vias_cruzamento")
+}

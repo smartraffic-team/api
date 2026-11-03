@@ -1,0 +1,16 @@
+name: smarttraffic-api
+services:
+  api:
+    build: .
+    env_file: ${API_ENV_FILE:-.env}
+    environment:
+      # No container, 127.0.0.1 seria o próprio container. Configure a URL
+      # com host.docker.internal no .env usado por este Compose.
+      DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL no .env}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../database/certs:/app/certs:ro
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    restart: unless-stopped
