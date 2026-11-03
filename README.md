@@ -28,6 +28,8 @@ npm run dev
 
 Defina `DATABASE_URL`, `JWT_SECRET` e `INGESTION_KEY` no `.env`. Use senhas diferentes e aleatórias para JWT e ingestão, com pelo menos 32 caracteres. A URL local usa o usuário criado pelo Compose do database. Para rodar a API em container, crie uma configuração própria com `host.docker.internal`:
 
+Se aparecer `PrismaClientInitializationError` com código **P1000**, confira usuário, senha, porta e nome do banco na `DATABASE_URL` de `api/.env`. Eles devem corresponder a `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_HOST_PORTA` e `MYSQL_DATABASE` de `database/.env`. Teste sem mostrar a senha com `npm run db:check`. Alterar `database/.env` depois que o volume MySQL foi criado não troca automaticamente a senha já gravada no servidor; nesse caso, restaure a senha original ou altere a senha do usuário no MySQL de forma explícita.
+
 ```powershell
 Copy-Item .env .env.docker
 (Get-Content .env.docker) -replace '@127.0.0.1:', '@host.docker.internal:' | Set-Content .env.docker
