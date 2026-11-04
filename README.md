@@ -56,6 +56,8 @@ Remove-Item Env:ADMIN_PASSWORD
 
 O comando recusa criar outra conta se já existir um administrador. Usuários posteriores são criados por um administrador autenticado em `POST /usuarios`.
 
+Para redefinir a senha de um administrador ativo sem conhecer a senha antiga, defina `ADMIN_EMAIL` e `ADMIN_PASSWORD` (12 ou mais caracteres) no ambiente e execute `npm run build` seguido de `npm run admin:reset-password`. O comando usa a `DATABASE_URL` do `api/.env` por padrão; confirme o banco antes de executar. Remova `ADMIN_PASSWORD` do ambiente depois. Tokens JWT já emitidos permanecem válidos até expirarem (no máximo uma hora).
+
 ## Contratos HTTP
 
 Prefixo `/api/v1`; Swagger em `http://localhost:3000/api/docs`. Leituras exigem `Authorization: Bearer <token>`, exceto `/health` e `/auth/login`. As rotas de escrita de leituras, fases e telemetria usam apenas `x-ingestion-key`. Use HTTPS fora do ambiente local. Não envie a chave de ingestão ao frontend.

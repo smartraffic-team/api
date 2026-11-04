@@ -13,6 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",
     "admin:create": "node -r dotenv/config dist/cli/create-admin.js",
+    "admin:reset-password": "node -r dotenv/config dist/cli/reset-admin-password.js",
     "db:check": "node -r dotenv/config scripts/check-db.cjs"
   },
   "dependencies": {
