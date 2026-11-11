@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ConflictException,
   Get,
   Post,
   Query,
@@ -45,6 +46,36 @@ export class TelemetriaController {
     if (!device?.ativo)
       throw new BadRequestException('Dispositivo inexistente ou inativo');
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM dispositivos WHERE id = ${device.id} FOR UPDATE`;
+      const existing = await tx.telemetria_dispositivos.findFirst({
+        where: {
+          dispositivo_id: device.id,
+          registrado_em: new Date(dto.registradoEm),
+        },
+      });
+      if (existing) {
+        if (
+          existing.status === dto.status &&
+          (existing.cpu_percentual == null
+            ? null
+            : Number(existing.cpu_percentual)) ===
+            (dto.cpuPercentual ?? null) &&
+          (existing.memoria_percentual == null
+            ? null
+            : Number(existing.memoria_percentual)) ===
+            (dto.memoriaPercentual ?? null) &&
+          (existing.temperatura_c == null
+            ? null
+            : Number(existing.temperatura_c)) === (dto.temperaturaC ?? null) &&
+          (existing.fps == null ? null : Number(existing.fps)) ===
+            (dto.fps ?? null) &&
+          existing.latencia_ms === (dto.latenciaMs ?? null)
+        )
+          return existing;
+        throw new ConflictException(
+          'Telemetria já registrada com conteúdo diferente',
+        );
+      }
       const recorded = await tx.telemetria_dispositivos.create({
         data: {
           dispositivo_id: device.id,

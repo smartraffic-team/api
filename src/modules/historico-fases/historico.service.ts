@@ -22,6 +22,22 @@ export class HistoricoService {
         Array<{ id: bigint }>
       >`SELECT id FROM semaforos WHERE id = ${id} FOR UPDATE`;
       if (!locked.length) throw new BadRequestException('Semáforo inexistente');
+      const existing = await tx.historico_fases.findFirst({
+        where: { semaforo_id: id, inicio_em: inicio },
+      });
+      if (existing) {
+        // Uma fase aberta pode ter sido fechada pelo próximo evento após o envio.
+        if (
+          existing.cor === dto.cor &&
+          existing.origem_estado === dto.origemEstado &&
+          existing.modo_operacao === (dto.modoOperacao ?? null) &&
+          (!fim || existing.fim_em?.getTime() === fim.getTime())
+        )
+          return existing;
+        throw new ConflictException(
+          'Fase já registrada com conteúdo diferente',
+        );
+      }
       const last = await tx.historico_fases.findFirst({
         where: { semaforo_id: id },
         orderBy: [{ inicio_em: 'desc' }, { id: 'desc' }],

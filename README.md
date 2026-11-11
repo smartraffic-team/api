@@ -100,6 +100,10 @@ Content-Type: application/json
 
 O Python deve identificar a via de forma confiável e reutilizar o UUID ao reenviar. A restrição única `(dispositivo_id, identificador_evento)` garante a deduplicação mesmo com concorrência. Contagem por quadro não equivale a veículos únicos; campos não medidos ficam nulos. Erros comuns: 400 (validação), 401 (credencial), 403 (nível), 404 (registro), 409 (duplicado/transição), 422 (restrição do banco), 429 (limite).
 
+Fases também aceitam reenvio pelo par `(semaforoId, inicioEm)` e telemetria pelo par `(dispositivoId, registradoEm)`, desde que o conteúdo coincida. Conteúdo diferente retorna 409. Uma fase inicialmente aberta pode já ter sido fechada por um evento posterior: reenviar a abertura retorna o registro existente e não altera o estado atual. O bloqueio transacional do semáforo/dispositivo serializa tentativas concorrentes. Não há migração de schema nesta mudança.
+
+O cliente `computer-vision/ingestion.py` envia amostras QUADRO, estados observados e saúde por uma fila SQLite persistente. Consulte `../computer-vision/INGESTION.md`. Para preparar dispositivos no ambiente local, `node scripts/setup-local-ingestion.cjs` usa o administrador definido em `.env.local-admin` e grava a configuração ignorada do Python. Crie o administrador primeiro pelo procedimento da seção Primeiro administrador; o utilitário não cria nem redefine usuários.
+
 ## Prisma e estrutura
 
 `prisma/schema.prisma` foi gerado por `prisma db pull` a partir do MySQL local V2.1. A coluna gerada `historico_fases.semaforo_fase_aberta` foi marcada `@ignore` para impedir escrita; o índice único continua no SQL. Após uma migração oficial do repositório database, atualize o banco local, execute `npm run prisma:pull`, revise o diff e gere o client.
@@ -129,7 +133,7 @@ A suíte recusa URLs sem `teste`. O CI monta um MySQL temporário, aplica o SQL 
 
 ## Limitações e próximos passos
 
-- O frontend React atual usa mocks de cinco cruzamentos e campos que não existem no banco V2.1. A integração deve adaptar o provider aos dados reais de um cruzamento, sem mudar o SQL para imitar mocks.
-- Ainda faltam o cliente Python enviando UUID/via confiáveis, o aplicativo mobile e a implantação HTTPS da API. O controlador local continua responsável pela segurança dos LEDs.
-- O repositório `computer-vision` atualmente mostra um servidor Flask de streaming de câmera, sem envio de detecções para a API; `Mobile` ainda não define contratos de cliente. A integração precisa ser implementada nesses projetos posteriormente. O firmware Arduino recebe comandos locais por serial; esta API não envia esses comandos.
+- O provider HTTP de `SmartTraffic-platform` já consulta a API. A próxima etapa é validar as telas com as leituras reais do cruzamento e com a ausência de medição na via sem câmera.
+- O cliente Python já envia leituras, fases e telemetria com fila persistente; faltam o aplicativo mobile e a implantação HTTPS da API. O controlador local continua responsável pelos LEDs. A operação real deve ser validada para cada ambiente configurado.
+- O firmware Arduino recebe comandos locais por serial; esta API não envia esses comandos. A integração visual da plataforma deve ser validada com as leituras persistidas.
 - O Swagger descreve DTOs e rotas, mas os contratos de resposta específicos podem receber exemplos adicionais quando web/mobile forem integrados.

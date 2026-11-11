@@ -215,6 +215,17 @@ describe('API com MySQL isolado', () => {
       })
       .expect(201);
     expect(phase.body.cor).toBe('VERMELHO');
+    const duplicatePhase = await request(app.getHttpServer())
+      .post('/api/v1/historico-fases')
+      .set('x-ingestion-key', process.env.INGESTION_KEY!)
+      .send({
+        semaforoId: semaforos.body[0].id,
+        cor: 'VERMELHO',
+        inicioEm: phase.body.inicioEm,
+        origemEstado: 'SIMULACAO',
+      })
+      .expect(201);
+    expect(duplicatePhase.body.id).toBe(phase.body.id);
     await request(app.getHttpServer())
       .post('/api/v1/historico-fases')
       .set('x-ingestion-key', process.env.INGESTION_KEY!)
@@ -246,6 +257,34 @@ describe('API com MySQL isolado', () => {
       })
       .expect(201);
     expect(telemetry.body.status).toBe('ONLINE');
+    const duplicates = await Promise.all(
+      [1, 2].map(() =>
+        request(app.getHttpServer())
+          .post('/api/v1/telemetria')
+          .set('x-ingestion-key', process.env.INGESTION_KEY!)
+          .send({
+            dispositivoId: deviceId,
+            registradoEm: telemetry.body.registradoEm,
+            status: 'ONLINE',
+            cpuPercentual: 42,
+          })
+          .expect(201),
+      ),
+    );
+    expect(duplicates.map((r) => r.body.id)).toEqual([
+      telemetry.body.id,
+      telemetry.body.id,
+    ]);
+    await request(app.getHttpServer())
+      .post('/api/v1/telemetria')
+      .set('x-ingestion-key', process.env.INGESTION_KEY!)
+      .send({
+        dispositivoId: deviceId,
+        registradoEm: telemetry.body.registradoEm,
+        status: 'OFFLINE',
+        cpuPercentual: 42,
+      })
+      .expect(409);
     const alert = await request(app.getHttpServer())
       .post('/api/v1/alertas')
       .set('Authorization', `Bearer ${token}`)
