@@ -8,7 +8,7 @@ const admin = dotenv.parse(
   fs.readFileSync(path.join(root, '.env.local-admin')),
 );
 const base = 'http://127.0.0.1:3000/api/v1';
-const road = process.env.SMARTTRAFFIC_OBSERVED_ROAD || 'A';
+const addCameraB = process.argv.includes('--add-camera-b');
 let token;
 async function call(route, body) {
   const response = await fetch(base + route, {
@@ -28,15 +28,23 @@ async function main() {
     root,
     '../computer-vision/ingestion.local.json',
   );
-  if (fs.existsSync(destination))
+  const exists = fs.existsSync(destination);
+  if (exists && !addCameraB)
     throw new Error('ingestion.local.json já existe; não será sobrescrito.');
+  if (addCameraB && !exists)
+    throw new Error('ingestion.local.json não existe; execute a configuração inicial sem --add-camera-b.');
+  const existingConfig = addCameraB
+    ? JSON.parse(fs.readFileSync(destination, 'utf8'))
+    : null;
   const login = await call('/auth/login', {
     email: admin.ADMIN_EMAIL,
     senha: admin.ADMIN_PASSWORD,
   });
   token = login.accessToken;
-  const via = (await call('/vias')).find((v) => v.codigo === road);
-  if (!via) throw new Error('Via não cadastrada.');
+  const roads = await call('/vias');
+  const viaA = roads.find((v) => v.codigo === 'A');
+  const viaB = roads.find((v) => v.codigo === 'B');
+  if (!viaA || !viaB) throw new Error('Vias A e B não cadastradas.');
   const devices = await call('/dispositivos');
   async function device(codigo, nome, tipo, viaId) {
     const found = devices.find((d) => d.codigo === codigo);
@@ -58,12 +66,26 @@ async function main() {
       })
     ).id;
   }
-  const camera = await device(
-    'CAM-LOCAL-' + road,
-    'Webcam da via ' + road,
+  const cameraA = await device(
+    'CAM-LOCAL-A',
+    'Webcam da via A',
     'CAMERA',
-    via.id,
+    viaA.id,
   );
+  if (addCameraB && existingConfig.camera_id !== cameraA)
+    throw new Error('A câmera A configurada não corresponde a CAM-LOCAL-A; configuração mantida.');
+  const cameraB = await device(
+    'CAM-LOCAL-B',
+    'Webcam da via B',
+    'CAMERA',
+    viaB.id,
+  );
+  if (addCameraB && existingConfig.camera_b_id) {
+    if (existingConfig.camera_b_id !== cameraB)
+      throw new Error('camera_b_id já existe e não corresponde a CAM-LOCAL-B; configuração mantida.');
+    console.log('A câmera B já está configurada na API e no arquivo local.');
+    return;
+  }
   const computer = await device(
     'PC-LOCAL',
     'Computador de processamento local',
@@ -78,30 +100,37 @@ async function main() {
   const signalA = signals.find((s) => s.vias.codigo === 'A');
   const signalB = signals.find((s) => s.vias.codigo === 'B');
   if (!signalA || !signalB) throw new Error('Semáforos A/B não cadastrados.');
-  fs.writeFileSync(
-    destination,
-    JSON.stringify(
-      {
+  const generatedConfig = {
         enabled: true,
         api_url: base,
         ingestion_key: env.INGESTION_KEY,
-        camera_id: camera,
+        camera_id: cameraA,
+        camera_b_id: cameraB,
         computer_id: computer,
         arduino_id: arduino,
         signal_a_id: signalA.id,
         signal_b_id: signalB.id,
-        reading_interval: 5,
+        reading_interval: 1.5,
         telemetry_interval: 15,
-      },
-      null,
-      2,
-    ) + '\n',
-    { flag: 'wx' },
-  );
+      };
+  if (addCameraB) {
+    const temp = destination + '.tmp';
+    fs.writeFileSync(
+      temp,
+      JSON.stringify({ ...existingConfig, camera_b_id: cameraB }, null, 2) + '\n',
+      { flag: 'wx' },
+    );
+    fs.renameSync(temp, destination);
+  } else {
+    fs.writeFileSync(
+      destination,
+      JSON.stringify(generatedConfig, null, 2) + '\n',
+      { flag: 'wx' },
+    );
+  }
   console.log(
-    'Ingestão configurada para a via ' +
-      road +
-      '; segredo salvo apenas no arquivo local ignorado.',
+    (addCameraB ? 'Câmera B adicionada à configuração local.' : 'Ingestão configurada para as vias A e B.') +
+      ' Segredo salvo apenas no arquivo local ignorado.',
   );
 }
 main().catch((error) => {
