@@ -9,12 +9,15 @@ import { LeiturasService } from './leituras.service';
 @Controller('leituras')
 export class LeiturasController {
   constructor(private service: LeiturasService) {}
-  @ApiBearerAuth() @Get() list(@Query() query: ReadingsQuery) {
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 300, ttl: 60_000 } })
+  @Get()
+  list(@Query() query: ReadingsQuery) {
     return this.service.list(query);
   }
   @Ingest()
   @ApiHeader({ name: 'x-ingestion-key' })
-  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @Throttle({ default: { limit: 300, ttl: 60_000 } })
   @Post()
   create(@Body() dto: ReadingDto) {
     return this.service.create(dto);
